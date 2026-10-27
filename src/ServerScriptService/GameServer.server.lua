@@ -8,6 +8,9 @@ local PlayerDataService = require(script.Parent:WaitForChild("PlayerDataService"
 local MonsterService = require(script.Parent:WaitForChild("MonsterService"))
 local InventoryService = require(script.Parent:WaitForChild("InventoryService"))
 local ZoneService = require(script.Parent:WaitForChild("ZoneService"))
+local AutoFarmService = require(script.Parent:WaitForChild("AutoFarmService"))
+local DungeonService = require(script.Parent:WaitForChild("DungeonService"))
+local QuestService = require(script.Parent:WaitForChild("QuestService"))
 
 local function ensureFolder(name, parent)
 	local folder = parent:FindFirstChild(name)
@@ -46,6 +49,41 @@ if not inventoryRemote then
 	inventoryRemote = Instance.new("RemoteEvent")
 	inventoryRemote.Name = "InventoryRequest"
 	inventoryRemote.Parent = remotesFolder
+end
+
+local autoFarmRemote = remotesFolder:FindFirstChild("AutoFarmRequest")
+if not autoFarmRemote then
+	autoFarmRemote = Instance.new("RemoteEvent")
+	autoFarmRemote.Name = "AutoFarmRequest"
+	autoFarmRemote.Parent = remotesFolder
+end
+
+local profileRemote = remotesFolder:FindFirstChild("ProfileRequest")
+if not profileRemote then
+	profileRemote = Instance.new("RemoteFunction")
+	profileRemote.Name = "ProfileRequest"
+	profileRemote.Parent = remotesFolder
+end
+
+local zoneRemote = remotesFolder:FindFirstChild("ZoneRequest")
+if not zoneRemote then
+	zoneRemote = Instance.new("RemoteEvent")
+	zoneRemote.Name = "ZoneRequest"
+	zoneRemote.Parent = remotesFolder
+end
+
+local dungeonRemote = remotesFolder:FindFirstChild("DungeonRequest")
+if not dungeonRemote then
+	dungeonRemote = Instance.new("RemoteEvent")
+	dungeonRemote.Name = "DungeonRequest"
+	dungeonRemote.Parent = remotesFolder
+end
+
+local questRemote = remotesFolder:FindFirstChild("QuestRequest")
+if not questRemote then
+	questRemote = Instance.new("RemoteEvent")
+	questRemote.Name = "QuestRequest"
+	questRemote.Parent = remotesFolder
 end
 
 local feedbackRemote = remotesFolder:FindFirstChild("CombatFeedback")
@@ -90,6 +128,34 @@ local function applyPlayerSpawn(player)
 		end
 	end)
 end
+	profileRemote.OnServerInvoke = function(player)
+		local profile = PlayerDataService.GetProfile(player)
+		if not profile then
+			return nil
+		end
+
+		local stats = profile.Stats or {}
+		local copiedStats = {}
+		for statName, statValue in pairs(stats) do
+			copiedStats[statName] = statValue
+		end
+
+		local level = profile.Level or 1
+		return {
+			Class = profile.Class or "Warrior",
+			Level = level,
+			Exp = profile.Exp or 0,
+			ExpForLevel = Config.XPTable[level] or 0,
+			ExpForNextLevel = Config.XPTable[level + 1] or Config.XPTable[level] or 0,
+			Gold = profile.Gold or 0,
+			StatPoints = profile.StatPoints or 0,
+			Stats = copiedStats,
+			Health = profile.Health or 100,
+			Mana = profile.Mana or 50,
+			MaxMana = 50 + (stats.INT or 0) * 4,
+		}
+	end
+
 
 local function onPlayerAdded(player)
 	PlayerDataService.LoadPlayerProfile(player)
@@ -108,6 +174,8 @@ for _, player in ipairs(Players:GetPlayers()) do
 end
 
 Players.PlayerAdded:Connect(onPlayerAdded)
+DungeonService.Initialize()
+QuestService.Initialize()
 
 combatRemote.OnServerEvent:Connect(function(player, targetMonsterId)
 	if not player or not player.Character then
@@ -128,6 +196,13 @@ combatRemote.OnServerEvent:Connect(function(player, targetMonsterId)
 
 	local target = MonsterService.GetMonsterById(targetMonsterId)
 	if not target or not target.Model or not target.Model.Parent then
+		return
+	end
+	if (profile.Level or 1) < (target.Template.Level or 1) then
+		feedbackRemote:FireClient(player, "LevelLocked", {
+			RequiredLevel = target.Template.Level or 1,
+			MonsterName = target.Template.Name,
+		})
 		return
 	end
 
@@ -181,6 +256,13 @@ skillRemote.OnServerEvent:Connect(function(player, skillName, targetMonsterId)
 	if not target or not target.Model or not target.Model.Parent then
 		return
 	end
+	if (profile.Level or 1) < (target.Template.Level or 1) then
+		feedbackRemote:FireClient(player, "LevelLocked", {
+			RequiredLevel = target.Template.Level or 1,
+			MonsterName = target.Template.Name,
+		})
+		return
+	end
 
 	local targetRoot = target.Model:FindFirstChild("HumanoidRootPart")
 	local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
@@ -231,11 +313,54 @@ inventoryRemote.OnServerEvent:Connect(function(player, action, payload)
 		if success then
 			feedbackRemote:FireClient(player, "InventoryUpdate", InventoryService.GetSnapshot(player))
 		end
+	elseif action == "use" then
+		local success = InventoryService.UseConsumable(player, payload)
+		if success then
+			feedbackRemote:FireClient(player, "InventoryUpdate", InventoryService.GetSnapshot(player))
+		end
 	elseif action == "addTestItem" then
 		InventoryService.AddItem(player, payload or "IronSword", 1)
 		feedbackRemote:FireClient(player, "InventoryUpdate", InventoryService.GetSnapshot(player))
 	else
 		feedbackRemote:FireClient(player, "InventoryUpdate", InventoryService.GetSnapshot(player))
+	end
+end)
+
+autoFarmRemote.OnServerEvent:Connect(function(player, settings)
+	if not player then
+		return
+	end
+	AutoFarmService.SetSettings(player, settings or {})
+end)
+
+zoneRemote.OnServerEvent:Connect(function(player, zoneKey)
+	if type(zoneKey) ~= "string" then
+		return
+	end
+	if zoneKey == "sync" then
+		feedbackRemote:FireClient(player, "ZoneUpdate", {
+			Success = true,
+			Zones = ZoneService.GetSnapshot(player),
+		})
+		return
+	end
+	local success, message = ZoneService.TravelToZone(player, zoneKey)
+	feedbackRemote:FireClient(player, "ZoneUpdate", {
+		Success = success,
+		Message = success and ("Arrived at " .. tostring(message)) or tostring(message),
+		Zones = ZoneService.GetSnapshot(player),
+	})
+end)
+
+dungeonRemote.OnServerEvent:Connect(function(player, action)
+	if type(action) == "string" then
+		DungeonService.Request(player, action)
+	end
+end)
+
+questRemote.OnServerEvent:Connect(function(player, action)
+	if type(action) == "string" then
+		QuestService.Request(player, action)
 	end
 end)
 

@@ -171,4 +171,24 @@ function InventoryService.RemoveItem(player, itemId, quantity)
 	return true
 end
 
+function InventoryService.UseConsumable(player, itemId)
+	local profile = getProfile(player)
+	local itemDefinition = Items.GetDefinition(itemId)
+	local character = player and player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if not profile or not itemDefinition or itemDefinition.Type ~= "Consumable" or not humanoid then
+		return false
+	end
+	if humanoid.Health <= 0 or humanoid.Health >= humanoid.MaxHealth then
+		return false
+	end
+	local _, entry = findInventoryEntry(profile, itemId)
+	if not entry or not InventoryService.RemoveItem(player, itemId, 1) then
+		return false
+	end
+
+	humanoid.Health = math.min(humanoid.MaxHealth, humanoid.Health + (itemDefinition.RestoreHealth or 0))
+	return true
+end
+
 return InventoryService

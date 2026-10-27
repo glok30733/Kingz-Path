@@ -65,6 +65,7 @@ Items.Definitions = {
 		Rarity = "Common",
 		Description = "Restores a small amount of health when used.",
 		Stats = {},
+		RestoreHealth = 40,
 		Value = 10,
 		Stackable = true,
 	},
