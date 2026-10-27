@@ -8,6 +8,7 @@ WorldConfig.Zones = {
 		SpawnPosition = Vector3.new(0, 5, 0),
 		RecommendedClass = "Warrior",
 		MonsterPool = { "Slime" },
+		MonsterCount = 4,
 		AccessRequirement = "None",
 		LootProgression = { "Common", "Uncommon" },
 	},
@@ -18,6 +19,10 @@ WorldConfig.Zones = {
 		SpawnPosition = Vector3.new(120, 5, 0),
 		RecommendedClass = "Warrior",
 		MonsterPool = { "Slime", "Wolf" },
+		MonsterCount = 5,
+		SpecialSpawns = {
+			{ Template = "EliteWolf", Offset = Vector3.new(0, 0, 30) },
+		},
 		AccessRequirement = "Level 10",
 		LootProgression = { "Uncommon", "Rare" },
 	},
@@ -28,6 +33,10 @@ WorldConfig.Zones = {
 		SpawnPosition = Vector3.new(240, 5, 0),
 		RecommendedClass = "Assassin",
 		MonsterPool = { "Wolf", "Skeleton" },
+		MonsterCount = 5,
+		SpecialSpawns = {
+			{ Template = "AncientGuardian", Offset = Vector3.new(0, 0, 30) },
+		},
 		AccessRequirement = "Level 20",
 		LootProgression = { "Rare", "Epic" },
 	},
@@ -38,6 +47,7 @@ WorldConfig.Zones = {
 		SpawnPosition = Vector3.new(360, 5, 0),
 		RecommendedClass = "Mage",
 		MonsterPool = { "Skeleton" },
+		MonsterCount = 5,
 		AccessRequirement = "Level 35",
 		LootProgression = { "Rare", "Epic" },
 	},
@@ -48,6 +58,7 @@ WorldConfig.Zones = {
 		SpawnPosition = Vector3.new(480, 5, 0),
 		RecommendedClass = "Assassin",
 		MonsterPool = { "Skeleton" },
+		MonsterCount = 6,
 		AccessRequirement = "Level 50",
 		LootProgression = { "Epic", "Legendary" },
 	},
@@ -58,20 +69,20 @@ WorldConfig.Zones = {
 		SpawnPosition = Vector3.new(600, 5, 0),
 		RecommendedClass = "Mage",
 		MonsterPool = { "Skeleton" },
+		MonsterCount = 6,
 		AccessRequirement = "Level 70",
 		LootProgression = { "Epic", "Legendary", "Mythic" },
 	},
 }
 
 function WorldConfig.GetZoneForLevel(level)
-	local zoneName = "StarterVillage"
+	local selectedZone = WorldConfig.Zones.StarterVillage
 	for name, zone in pairs(WorldConfig.Zones) do
-		if level >= (zone.LevelMin or 1) and level <= (zone.LevelMax or 999) then
-			zoneName = name
-			break
+		if level >= (zone.LevelMin or 1) and (zone.LevelMin or 1) > (selectedZone.LevelMin or 1) then
+			selectedZone = zone
 		end
 	end
-	return WorldConfig.Zones[zoneName]
+	return selectedZone
 end
 
 return WorldConfig

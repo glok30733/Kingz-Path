@@ -165,6 +165,7 @@ function PlayerDataService.ApplyProfileToCharacter(player)
 	end
 
 	player:SetAttribute("Class", profile.Class or "Warrior")
+	player:SetAttribute("Level", profile.Level or 1)
 	local character = player.Character or player.CharacterAdded:Wait()
 	local humanoid = character:WaitForChild("Humanoid")
 	local rootPart = character:WaitForChild("HumanoidRootPart")
@@ -190,6 +191,7 @@ function PlayerDataService.AddExperience(player, amount)
 		profile.StatPoints = (profile.StatPoints or 0) + (newLevel - previousLevel)
 	end
 	profile.Level = newLevel
+	player:SetAttribute("Level", newLevel)
 	refreshDerivedProfile(profile)
 	return profile.Exp
 end
